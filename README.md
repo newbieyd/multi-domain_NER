@@ -9,7 +9,17 @@
 | _bert-base-chinese_ | BERT预训练模型文件（pytorch） |
 | _data_ | 数据（train, dev, test, tags） |
 | _ner.py_ | 多领域命名实体识别（pytorch） |
- 
+
+## 环境参数
+
+python        3.6
+torch         1.4.0              
+torchvision   0.5.0
+tensorboard   2.3.0                           
+tensorboardX  2.1
+transformers  3.1.0
+tqdm          4.49.0 
+
 ## 可选参数
 
 | 参数 | 描述 | 解释 |
