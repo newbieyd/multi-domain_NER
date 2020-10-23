@@ -40,3 +40,6 @@
 >+ 若使用 __--train_file__ 和 __--dev_file__ 则会额外域保存在开发集上的最高分数的模型 *checkpoint-best.kpl*
 >+ __--test-file__ 则为测试方式如存在 *checkpoint-best.kpl* 则使用该模型，否则使用 *checkpoint-last.kpl*
 
+## 脚本样例
+
+./scripts/train.sh(https://github.com/newbieyd/multi-domain_NER/blob/yangdi/scripts/train.sh)
