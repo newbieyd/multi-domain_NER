@@ -12,19 +12,19 @@
 
 ## 环境参数
 
-python        3.6
+python        --3.6
 
-torch         1.4.0 
+torch         --1.4.0 
 
-torchvision   0.5.0
+torchvision   --0.5.0
 
-tensorboard   2.3.0 
+tensorboard   --2.3.0 
 
-tensorboardX  2.1
+tensorboardX  --2.1
 
-transformers  3.1.0
+transformers  --3.1.0
 
-tqdm          4.49.0 
+tqdm          --4.49.0 
 
 ## 可选参数
 
