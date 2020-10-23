@@ -36,7 +36,7 @@
 ## 可选参数特殊说明
 
 --train_file --dev_file --test_file 分别同时代表运行方式
->+ 只使用*--train_file*则只训练到固定轮数，保存为最后的模型_checkpoint-last.kpl_
->+ 若使用*--train_file*和*--dev_file*则会额外域保存在开发集上的最高分数的模型_checkpoint-best.kpl_
->+ *--test-file*则为测试方式如存在checkpoint-best.kpl则使用该模型，否则使用_checkpoint-last.kpl_
+>+ 只使用**--train_file**则只训练到固定轮数，保存为最后的模型*checkpoint-last.kpl*
+>+ 若使用**--train_file**和**--dev_file**则会额外域保存在开发集上的最高分数的模型*checkpoint-best.kpl*
+>+ **--test-file**则为测试方式如存在checkpoint-best.kpl则使用该模型，否则使用*checkpoint-last.kpl*
 
