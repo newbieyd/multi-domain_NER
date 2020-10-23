@@ -13,7 +13,7 @@
 ## 可选参数
 
 | 参数 | 描述 | 解释 |
-| :---- | :---- |
+| :---- | :---- | :---- |
 |-h, --help | show this help message and exit | |
 |--train_file | TRAIN_FILE The training file path. | 训练数据 |
 |--dev_file DEV_FILE |  The development file path. | 验证数据 |
