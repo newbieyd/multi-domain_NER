@@ -8,8 +8,8 @@ BERT模型下载:<https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-
 
 目录格式：
 
-|-config.json
+  _config.json_
 
-|-pytorch_model.bin
+  _pytorch_model.bin_
 
-|-vocab.txt
+  _vocab.txt_
