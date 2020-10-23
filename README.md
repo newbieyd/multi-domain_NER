@@ -32,3 +32,11 @@
 |--bert_config_file BERT_CONFIG_FILE | The config json file corresponding to the pre-trained BERT model. This specifies the model architecture. | BERT预训练模型 |
 |--cpu  | Whether to use CPU, if not and CUDA is avaliable can use CPU. | 如果使用CPU |
 |--seed SEED | random seed for initialization. | 随机种子 |
+
+## 可选参数特殊说明
+
+--train_file --dev_file --test_file 分别同时代表运行方式
+>+ 只使用--train_file则只训练到固定轮数，保存为最后的模型checkpoint-last.kpl
+>+ 若使用--train_file和--dev_file则会额外域保存在开发集上的最高分数的模型checkpoint-best.kpl
+>+ --test-file则为测试方式如存在checkpoint-best.kpl则使用该模型，否则使用checkpoint-last.kpl
+
