@@ -42,4 +42,4 @@
 
 ## 脚本样例
 
-./scripts/train.sh(https://github.com/newbieyd/multi-domain_NER/blob/yangdi/scripts/train.sh)
+[./scripts/train.sh](https://github.com/newbieyd/multi-domain_NER/blob/yangdi/scripts/train.sh)
