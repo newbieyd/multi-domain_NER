@@ -1,5 +1,3 @@
-cat ./train.sh
-
 python -u ./ner.py \
 --bert_config_file ./bert-base-chinese \
 --train_file ./data/train_bio.txt \
@@ -14,5 +12,3 @@ python -u ./ner.py \
 --test_batch_size 1 \
 --tensorboard ./output/logs \
 --seed 1
-
-cp ./train.sh ./output
