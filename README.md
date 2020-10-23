@@ -11,6 +11,7 @@
 | _ner.py_ | 多领域命名实体识别（pytorch） |
  
 ## 可选参数
+
 | 参数 | 描述 | 解释 |
 | :---- | :---- |
 |-h, --help | show this help message and exit | |
