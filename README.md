@@ -10,6 +10,12 @@
 | _data_ | 数据（train, dev, test, tags） |
 | _ner.py_ | 多领域命名实体识别（pytorch） |
 
+## 数据格式说明
+
+数据文件（*train*，*dev*，*test*）采用BIO的标注格式，其中每行为一个字符和一个标签（中间以\t分开），空行表示一句话结束。详细可以看*data*中的样例。
+
+*class.txt*为实体类别，如PER（数据文件中被标记为*B-PER*，*I-PER*）。
+
 ## 环境参数
 
 python        --3.6
