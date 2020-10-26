@@ -22,7 +22,7 @@ CRF方法使用数据中全部的标签类别（如*tag.txt*）。
 
 python        --3.6
 
-pytorch-crf   --0.7.2
+pytorch-crf   --0.7.2 （CRF方法需要）
 
 torch         --1.4.0 
 
