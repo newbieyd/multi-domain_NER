@@ -1,9 +1,9 @@
 python -u ./ner.py \
 --architecture crf \
 --bert_config_file ./bert-base-chinese \
---train_file ./data/train_bio.txt \
---dev_file ./data/dev_bio.txt \
---test_file ./data/test_bio.txt \
+--train_file ./data/train.txt \
+--dev_file ./data/dev.txt \
+--test_file ./data/test.txt \
 --output_dir ./output \
 --max_len 200 \
 --tags_file ./data/tags.txt \
