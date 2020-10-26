@@ -49,6 +49,7 @@ tqdm          --4.49.0
 |--test_batch_size TEST_BATCH_SIZE |The number of sentences contained in a batch during testing. |验证或测试的一批句子数 |
 |--epochs EPOCHS  | Total number of training epochs to perform. | 训练最大轮数 |
 |--learning_rate LEARNING_RATE | The initial learning rate for Adam. | 学习率 |
+|--crf_lr CRF_LR | The initial learning rate of CRF layer. | CRF层的学习率 |
 |--max_len MAX_LEN | The Maximum length of a sentence. | 句子最大长度（如果实际句子过长则按照split集切分） |
 |--keep_last_n_checkpoints KEEP_LAST_N_CHECKPOINTS | Keep the last n checkpoints. | 保留最后的几轮模型 | 
 |--warmup_proportion WARMUP_PROPORTION |Proportion of training to perform linear learning rate warmup for. | warmup |
@@ -65,6 +66,12 @@ tqdm          --4.49.0
 >+ 若使用 __--train_file__ 和 __--dev_file__ 则会额外域保存在开发集上的最高分数的模型 *checkpoint-best.kpl*
 >+ __--test-file__ 则为测试方式如存在 *checkpoint-best.kpl* 则使用该模型，否则使用 *checkpoint-last.kpl*
 
+### crf方法
+
+--crf_lr 有效，对CRF层设置不同的学习率
+
 ## 脚本样例
 
-[./scripts/train.sh](https://github.com/newbieyd/multi-domain_NER/blob/yangdi/scripts/train.sh)
+SPAN方法 ./scripts/span_train.sh
+
+CRF方法 ./scripts/crf_train.sh
