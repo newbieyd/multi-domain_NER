@@ -14,7 +14,9 @@
 
 数据文件（*train*，*dev*，*test*）采用BIO的标注格式，其中每行为一个字符和一个标签（中间以\t分开），空行表示一句话结束。详细可以看*data*中的样例。
 
-*class.txt*为实体类别，如PER（数据文件中被标记为*B-PER*，*I-PER*）。
+SPAN方法使用为实体类别（如*class.txt*），如PER（数据文件中被标记为*B-PER*，*I-PER*，非实体为*O*）。
+
+CRF方法使用数据中全部的标签类别（如*tag.txt*）。
 
 ## 环境参数
 
@@ -40,8 +42,9 @@ tqdm          --4.49.0
 |--train_file | TRAIN_FILE The training file path. | 训练数据 |
 |--dev_file DEV_FILE |  The development file path. | 验证数据 |
 |--test_file TEST_FILE | The testing file path. | 测试数据 |
-|--class_file CLASS_FILE | The testing file path. | 标签数据 |
+|--tags_file TAGS_FILE | The tags file path. | 标签数据 |
 |--output_dir OUTPUT_DIR | The output folder path. | 输出文件夹 |
+|--architecture {span,crf} | The model architecture of neural network and what decoding method is adopted. | 模型可选{span，crf} |
 |--train_batch_size TRAIN_BATCH_SIZE | The number of sentences contained in a batch during training. | 训练的一批句子数 |
 |--test_batch_size TEST_BATCH_SIZE |The number of sentences contained in a batch during testing. |验证或测试的一批句子数 |
 |--epochs EPOCHS  | Total number of training epochs to perform. | 训练最大轮数 |
