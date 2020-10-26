@@ -22,6 +22,8 @@ CRF方法使用数据中全部的标签类别（如*tag.txt*）。
 
 python        --3.6
 
+pytorch-crf   --0.7.2
+
 torch         --1.4.0 
 
 torchvision   --0.5.0
@@ -32,7 +34,7 @@ tensorboardX  --2.1
 
 transformers  --3.1.0
 
-tqdm          --4.49.0 
+tqdm          --4.49.0
 
 ## 可选参数
 
