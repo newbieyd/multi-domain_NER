@@ -838,7 +838,7 @@ def main():
     parser.add_argument("--train_file", default=None, help="The training file path.")
     parser.add_argument("--dev_file", default=None, help="The development file path.")
     parser.add_argument("--test_file", default=None, help="The testing file path.")
-    parser.add_argument("--tags_file", required=True, help="The testing file path.")
+    parser.add_argument("--tags_file", required=True, help="The tags file path.")
 
     parser.add_argument("--output_dir", required=True, help="The output folder path.")
 
