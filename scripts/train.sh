@@ -1,13 +1,15 @@
 python -u ./ner.py \
+--architecture crf \
 --bert_config_file ./bert-base-chinese \
---train_file ./data/train_bio.txt \
---dev_file ./data/dev_bio.txt \
---test_file ./data/test_bio.txt \
+--train_file ./data/train.txt \
+--dev_file ./data/dev.txt \
+--test_file ./data/test.txt \
 --output_dir ./output \
 --max_len 200 \
---class_file ./data/class.txt \
+--tags_file ./data/tags.txt \
 --train_batch_size 25 \
 --learning_rate 5e-5 \
+--crf_lr 0.0001 \
 --epoch 30 \
 --test_batch_size 1 \
 --tensorboard ./output/logs \
