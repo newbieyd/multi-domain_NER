@@ -12,4 +12,5 @@ python -u ./ner.py \
 --epoch 30 \
 --test_batch_size 1 \
 --tensorboard ./output/logs \
+--dropout 0.5 \
 --seed 1
