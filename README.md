@@ -1,6 +1,6 @@
-# multi-domain_NER
+# Named Entity Recognition
 
-多领域NER。
+命名实体识别（Pytorch），支持BERT-SPAN、BERT-CRF、BERT-SoftMax等模型。
 
 ## 文件目录
 
@@ -16,7 +16,7 @@
 
 SPAN方法使用为实体类别（如*class.txt*），如PER（数据文件中被标记为*B-PER*，*I-PER*，非实体为*O*）。
 
-CRF方法使用数据中全部的标签类别（如*tag.txt*）。
+CRF和SoftMax方法使用数据中全部的标签类别（如*tag.txt*）。
 
 ## 环境参数
 
@@ -36,6 +36,8 @@ transformers  --3.1.0
 
 tqdm          --4.49.0
 
+注：最新版本安装transformers时，将sentencepiece降到0.1.91版本，否则可能报错。
+
 ## 可选参数
 
 | 参数 | 描述 | 解释 |
@@ -46,12 +48,14 @@ tqdm          --4.49.0
 |--test_file TEST_FILE | The testing file path. | 测试数据 |
 |--tags_file TAGS_FILE | The tags file path. | 标签数据 |
 |--output_dir OUTPUT_DIR | The output folder path. | 输出文件夹 |
+|--model MODEL | The model path. | 验证和测试的模型路径 |
 |--architecture {span,crf} | The model architecture of neural network and what decoding method is adopted. | 模型可选{span，crf} |
 |--train_batch_size TRAIN_BATCH_SIZE | The number of sentences contained in a batch during training. | 训练的一批句子数 |
 |--test_batch_size TEST_BATCH_SIZE |The number of sentences contained in a batch during testing. |验证或测试的一批句子数 |
 |--epochs EPOCHS  | Total number of training epochs to perform. | 训练最大轮数 |
 |--learning_rate LEARNING_RATE | The initial learning rate for Adam. | 学习率 |
 |--crf_lr CRF_LR | The initial learning rate of CRF layer. | CRF层的学习率 |
+|--dropout DROPOUT | What percentage of neurons are discarded in the fully connected layers (0 ~ 1). | 全连接层Dropout丢失率 |
 |--max_len MAX_LEN | The Maximum length of a sentence. | 句子最大长度（如果实际句子过长则按照split集切分） |
 |--keep_last_n_checkpoints KEEP_LAST_N_CHECKPOINTS | Keep the last n checkpoints. | 保留最后的几轮模型 | 
 |--warmup_proportion WARMUP_PROPORTION |Proportion of training to perform linear learning rate warmup for. | warmup |
@@ -72,8 +76,14 @@ tqdm          --4.49.0
 
 --crf_lr 有效，对CRF层设置不同的学习率
 
+### -model作用
+
+如指定则在验证测试的时候使用该模型，否则使用验证集上的最高分时模型（*checkpoint-best.pkl*）,若无验证集则使用模型训练最后的模型（*checkpoint-last.pkl*）
+
 ## 脚本样例
 
 SPAN方法 ./scripts/span_train.sh
 
 CRF方法 ./scripts/crf_train.sh
+
+SotfMax方法 ./scripts/sotfmax_train.sh
