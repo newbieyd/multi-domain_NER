@@ -1,12 +1,12 @@
 python -u ./ner.py \
---architecture span \
+--architecture sotfmax \
 --bert_config_file ./bert-base-chinese \
 --train_file ./data/train.txt \
 --dev_file ./data/dev.txt \
 --test_file ./data/test.txt \
 --output_dir ./output \
 --max_len 200 \
---tags_file ./data/class.txt \
+--tags_file ./data/tags.txt \
 --train_batch_size 25 \
 --learning_rate 5e-5 \
 --epoch 30 \
