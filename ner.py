@@ -1,25 +1,30 @@
 import argparse
 import logging
+import os
+import random
+import time
+
 import torch
 import transformers
-from torchcrf import CRF
-from tqdm import tqdm
-import random
 import numpy as np
-import os
-import time
+from torchcrf import CRF
 from tensorboardX import SummaryWriter
+from tqdm import tqdm
 
 
+
+# 设置随机种子，一旦固定种子，后面依次生成的随机数其实都是固定的
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
 
+
+# 定义数据处理的父类
 class NERProcessor():
 
     def load_train_dataset(self, args, tokenizer, class_list):
-        return  None
+        return None
 
     def load_dev_dataset(self, args, tokenizer, class_list):
         return None, None
@@ -30,7 +35,8 @@ class NERProcessor():
     def get_tag_list(self):
         return None
 
-    def _load_data(self, file_path, mode = None):
+    # 加载train，dev，test文本文件（格式为：字 标签），返回的sentences是[[[字，标签]，[字，标签]，[字，标签]...]，[[]...],[[]...],[[]...]...]
+    def _load_data(self, file_path, mode=None):
         sentences = []
         with open(file_path, "r", encoding="utf8") as fin:
             sentence = []
@@ -49,6 +55,9 @@ class NERProcessor():
             logging.info("Read \"" + file_path + "\" sentence number:" + str(len(sentences)))
         return sentences
 
+    # 这是span方法用到的函数
+    # 每个句子都对应一个start_labels,长度为句长，记录的是每个实体开始的位置。参数data就是一个句子的labels。
+    # 每个句子都对应一个end_labels，长度为句长，记录的是每个实体最后的位置。
     def _bio_to_se(self, data):
         start_labels = ['O'] * len(data)
         end_labels = ['O'] * len(data)
@@ -65,6 +74,8 @@ class NERProcessor():
             i += 1
         return start_labels, end_labels
 
+    # 对句子按照最大句长截断句子。如果是span架构，则返回result。如果是crf或者softmax架构，则返回new_data。
+    # error_num表示的是超过最大句长但是没有标点的句子数目，这样的就强行截断。
     def _split(self, data, split_list, max_len, label_flag=False, mode="crf"):
         result = []
         new_data = []
@@ -107,13 +118,14 @@ class NERProcessor():
         return result, new_data
 
 
-class SEProcessor(NERProcessor):
+# span架构所需的数据处理类
+class SpanProcessor(NERProcessor):
     def load_train_dataset(self, args, tokenizer, class_list):
         data = self._load_data(args.train_file, "training")
-        split_list = args.split.split()
+        split_list = args.split.split()  # args参数定义那里有split的选项。所以split_list=[',', '，', '.', '。', '!', '！', '?', '？']
         data, _ = self._split(data, split_list, args.max_len - 2, True, mode="span")
         datasets = self._make_dataset(data, tokenizer, class_list, args.max_len, "Traning", 5)
-        return  datasets
+        return datasets
 
     def load_dev_dataset(self, args, tokenizer, class_list):
         data = self._load_data(args.dev_file, "development")
@@ -129,6 +141,7 @@ class SEProcessor(NERProcessor):
         datasets = self._make_dataset(data, tokenizer, class_list, args.max_len, "Testing", 5)
         return datasets, original_data
 
+    # span架构，取出data下的class.txt文件标签，并返回class_list。
     def get_tags_list(self, tags_file):
         class_list = []
         with open(tags_file, "r", encoding="utf8") as fin:
@@ -139,8 +152,10 @@ class SEProcessor(NERProcessor):
         logging.info("Class:" + str(class_list))
         return class_list
 
+    # 把train，dev，test文本转化成ID号。返回的是token_ids_list，mask_ids_list，token_type_ids_list，start_labels_ids_list，end_labels_ids_list张量。
     def _make_dataset(self, data, tokenizer, class_list, max_len, mode, num=0):
 
+        # 把句子中每个字的标签转换成标签列表中的ID号。
         def change_labels_to_ids(data, class_dict):
             result = [class_dict['O']]
             for label in data:
@@ -153,7 +168,7 @@ class SEProcessor(NERProcessor):
         token_type_ids_list = []
         start_labels_ids_list = []
         end_labels_ids_list = []
-        class_dict = {x:i+1 for i, x in enumerate(class_list)}
+        class_dict = {x: i + 1 for i, x in enumerate(class_list)}
         class_dict['O'] = 0
         for i, sentence in enumerate(data):
             text = sentence[0]
@@ -178,7 +193,7 @@ class SEProcessor(NERProcessor):
 
             if i < num:
                 logging.info("*** " + mode + " Example - " + str(i + 1) + " - ***")
-                logging.info("tokens: %s" % " ".join([str(x )for x in sentence[0]]))
+                logging.info("tokens: %s" % " ".join([str(x) for x in sentence[0]]))
                 logging.info("token_ids: %s" % " ".join([str(x) for x in token_ids]))
                 logging.info("mask_ids: %s" % " ".join([str(x) for x in mask_ids]))
                 logging.info("token_type_ids_list: %s" % " ".join([str(x) for x in ([0] * len(token_ids))]))
@@ -200,6 +215,7 @@ class SEProcessor(NERProcessor):
         )
 
 
+# CRF架构所需的数据处理类
 class CRFProcessor(NERProcessor):
 
     def load_train_dataset(self, args, tokenizer, tags_list):
@@ -207,7 +223,7 @@ class CRFProcessor(NERProcessor):
         split_list = args.split.split()
         _, data = self._split(data, split_list, args.max_len - 2, True, mode="crf")
         datasets = self._make_dataset(data, tokenizer, tags_list, args.max_len, "Traning", 5)
-        return  datasets
+        return datasets
 
     def load_dev_dataset(self, args, tokenizer, class_list):
         data = self._load_data(args.dev_file, "development")
@@ -223,7 +239,7 @@ class CRFProcessor(NERProcessor):
         datasets = self._make_dataset(data, tokenizer, class_list, args.max_len, "Testing", 5)
         return datasets, original_data
 
-
+    # CRF架构，取出data下tags标签，并加入<s>,<e>,<p>标签，返回tags_list
     def get_tags_list(self, tags_file):
         tags_list = []
         with open(tags_file, "r", encoding="utf8") as fin:
@@ -237,8 +253,10 @@ class CRFProcessor(NERProcessor):
         logging.info("Tags:" + str(tags_list))
         return tags_list
 
+    # 把train，dev，test文本转化成ID号。返回的是token_ids_list，mask_ids_list，token_type_ids_list，start_labels_ids_list，end_labels_ids_list张量。
     def _make_dataset(self, data, tokenizer, tags_list, max_len, mode, num=0):
 
+        # 把句子中每个字的标签转换成标签列表中的ID号。
         def change_labels_to_ids(data, tags_dict):
             result = [tags_dict['<s>']]
             for label in data:
@@ -250,7 +268,7 @@ class CRFProcessor(NERProcessor):
         mask_ids_list = []
         token_type_ids_list = []
         labels_ids_list = []
-        tags_dict = {x:i for i, x in enumerate(tags_list)}
+        tags_dict = {x: i for i, x in enumerate(tags_list)}
         for i, sentence in enumerate(data):
             text = sentence[0]
             labels = sentence[1]
@@ -270,7 +288,7 @@ class CRFProcessor(NERProcessor):
 
             if i < num:
                 logging.info("*** " + mode + " Example - " + str(i + 1) + " - ***")
-                logging.info("tokens: %s" % " ".join([str(x )for x in sentence[0]]))
+                logging.info("tokens: %s" % " ".join([str(x) for x in sentence[0]]))
                 logging.info("token_ids: %s" % " ".join([str(x) for x in token_ids]))
                 logging.info("mask_ids: %s" % " ".join([str(x) for x in mask_ids]))
                 logging.info("token_type_ids_list: %s" % " ".join([str(x) for x in ([0] * len(token_ids))]))
@@ -289,6 +307,76 @@ class CRFProcessor(NERProcessor):
         )
 
 
+# Softmax架构所需的数据处理类，可以继承CRF的数据处理类
+class SoftMaxProcessor(CRFProcessor):
+
+    # 取出softmax架构下tags标签，返回tags_list。这里与CRF稍有不同，不会加入<s>、<p>、<e>这三个多的标签。
+    def get_tags_list(self, tags_file):
+        tags_list = []
+        with open(tags_file, "r", encoding="utf8") as fin:
+            for line in fin.readlines():
+                data = line.replace("\n", "")
+                if len(data) > 0:
+                    tags_list.append(data)
+        logging.info("Tags:" + str(tags_list))
+        return tags_list
+
+    # 把train，dev，test文本转化成ID。返回的是token_ids_list，mask_ids_list，token_type_ids_list，start_labels_ids_list，end_labels_ids_list张量。
+    def _make_dataset(self, data, tokenizer, tags_list, max_len, mode="softmax", num=0):
+
+        # 把句子中每个字的标签转换成标签列表中的ID号。不用加开始、填充和结束字符。
+        def change_labels_to_ids(data, tags_dict):
+            result = [tags_dict['O']]
+            for label in data:
+                result.append(tags_dict[label])
+            result.append(tags_dict['O'])
+            return result
+
+        token_ids_list = []
+        mask_ids_list = []
+        token_type_ids_list = []
+        labels_ids_list = []
+        tags_dict = {x: i for i, x in enumerate(tags_list)}
+        for i, sentence in enumerate(data):
+            text = sentence[0]
+            labels = sentence[1]
+            # 经过tokenizer.encode()会添加上特殊字符[CLS]和[SEP]，所以label_ids要补充两个O字符
+            token_ids = tokenizer.encode(text)
+            mask_ids = [1] * len(token_ids)
+            label_ids = change_labels_to_ids(labels, tags_dict)
+            assert len(label_ids) == len(token_ids)
+
+            while len(token_ids) < max_len:
+                token_ids.append(0)
+                mask_ids.append(0)
+                label_ids.append(tags_dict['O'])
+
+            assert len(token_ids) == max_len
+            assert len(mask_ids) == max_len
+            assert len(label_ids) == max_len
+
+            if i < num:
+                logging.info("*** " + mode + " Example - " + str(i + 1) + " - ***")
+                logging.info("tokens: %s" % " ".join([str(x) for x in sentence[0]]))
+                logging.info("token_ids: %s" % " ".join([str(x) for x in token_ids]))
+                logging.info("mask_ids: %s" % " ".join([str(x) for x in mask_ids]))
+                logging.info("token_type_ids_list: %s" % " ".join([str(x) for x in ([0] * len(token_ids))]))
+                logging.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
+
+            token_ids_list.append(token_ids)
+            mask_ids_list.append(mask_ids)
+            token_type_ids_list.append([0] * len(token_ids))
+            labels_ids_list.append(label_ids)
+
+        return torch.utils.data.TensorDataset(
+            torch.tensor(token_ids_list, dtype=torch.long),
+            torch.tensor(mask_ids_list, dtype=torch.long),
+            torch.tensor(token_type_ids_list, dtype=torch.long),
+            torch.tensor(labels_ids_list, dtype=torch.long)
+        )
+
+
+# NER模型的父类
 class NERModel(torch.nn.Module):
     def __init__(self, bert_file_path):
         super(NERModel, self).__init__()
@@ -297,19 +385,21 @@ class NERModel(torch.nn.Module):
     def forward(self, ids, mask, token_type_ids):
         return None
 
-    def loss(self):
+    def loss(self, output, label, mask_ids):
         return None
 
-class SEModel(NERModel):
-    def __init__(self, bert_file_path, config, class_num):
-        super(SEModel, self).__init__(bert_file_path)
+
+# span架构模型
+class SpanModel(NERModel):
+    def __init__(self, bert_file_path, config, class_num, dropout):
+        super(SpanModel, self).__init__(bert_file_path)
         self.start_classifier = torch.nn.Sequential(
+            torch.nn.Dropout(dropout),
             torch.nn.Linear(config.hidden_size, class_num),
-            torch.nn.Dropout(),
             torch.nn.ReLU()
         )
         self.end_classifier = torch.nn.Sequential(
-            torch.nn.Dropout(),
+            torch.nn.Dropout(dropout),
             torch.nn.Linear(config.hidden_size, class_num),
             torch.nn.ReLU()
         )
@@ -320,25 +410,55 @@ class SEModel(NERModel):
         end_output = self.end_classifier(output)
         return start_output, end_output
 
-    def loss(self, start_output, end_output, start_labels_ids, end_labels_ids, mask_ids):
+    def loss(self, output, label, mask_ids):
         def calculate_loss(output, labels, mask_ids):
             bz, length = labels.shape
             mask = mask_ids.view(-1) == 1
             output = output.view(bz * length, -1)[mask]
             labels = labels.view(-1)[mask]
             return torch.nn.CrossEntropyLoss()(output, labels)
-
+        start_output = output['start_output']
+        start_labels_ids = label['start_labels_ids']
+        end_output = output['end_output']
+        end_labels_ids = label['end_labels_ids']
         loss_1 = calculate_loss(start_output, start_labels_ids, mask_ids)
         loss_2 = calculate_loss(end_output, end_labels_ids, mask_ids)
         return loss_1 + loss_2
 
 
+# Softmax架构模型！注意在pytorch中，交叉熵函数，会自动加一层softmax激活函数
+# 所以，训练时不需要自己把网络的输出结果再经过一次softmax了。解码的时候，也是选最大的，所以应该也不用softmax了。
+class SoftmaxModel(NERModel):
+    # 这个dropout和linear的顺序，应该影响不大
+    def __init__(self, bert_file_path, config, tags_num, dropout):
+        super(SoftmaxModel, self).__init__(bert_file_path)
+        self.dence = torch.nn.Sequential(
+            torch.nn.Dropout(dropout),
+            torch.nn.Linear(config.hidden_size, tags_num),
+            torch.nn.ReLU()
+        )
+
+    def forward(self, ids, mask, token_type_ids):
+        output, _ = self.bert(ids, attention_mask=mask, token_type_ids=token_type_ids)
+        output = self.dence(output)
+        return output
+
+    def loss(self, output, labels_ids, mask_ids):
+        bz, length = labels_ids.shape
+        mask = mask_ids.view(-1) == 1
+        output = output.view(bz * length, -1)[mask]
+        labels = labels_ids.view(-1)[mask]
+        loss = torch.nn.CrossEntropyLoss()(output, labels)
+        return loss
+
+
+# CRF架构模型
 class CRFModel(NERModel):
-    def __init__(self, bert_file_path, config, tags_num):
+    def __init__(self, bert_file_path, config, tags_num, dropout):
         super(CRFModel, self).__init__(bert_file_path)
         self.dence = torch.nn.Sequential(
+            torch.nn.Dropout(dropout),
             torch.nn.Linear(config.hidden_size, tags_num),
-            torch.nn.Dropout(),
             torch.nn.ReLU()
         )
         self.crf = CRF(tags_num, batch_first=True)
@@ -357,8 +477,9 @@ class CRFModel(NERModel):
         return self.crf.decode(output, mask)
 
 
-
+# 如果有了模型，则进行验证，span，crf，softmax架构可选择
 def development(model, device, dev_dataloader, tags_list, mode):
+    # 注意model.train()和model.eval()的不同作用。
     model.eval()
     start_time = time.time()
     if mode == "span":
@@ -366,10 +487,11 @@ def development(model, device, dev_dataloader, tags_list, mode):
         end_labels_ids_list = []
         start_output_list = []
         end_output_list = []
-    elif mode == "crf":
+    elif mode == "softmax" or mode == "crf":
         labels_ids_list = []
         output_list = []
     mask_ids_list = []
+    # tqdm进度条库，可视化
     for _, data in enumerate(tqdm(dev_dataloader, desc="Development")):
         token_ids = data[0].to(device, dtype=torch.long)
         mask_ids = data[1].to(device, dtype=torch.long)
@@ -385,6 +507,13 @@ def development(model, device, dev_dataloader, tags_list, mode):
             end_labels_ids_list.append(end_labels_ids)
             start_output_list.append(start_output)
             end_output_list.append(end_output)
+        elif mode == "softmax":
+            labels_ids = data[3].to(device, dtype=torch.long)
+            output = model(token_ids, mask_ids, token_type_ids)
+            output = output.argmax(dim=-1)
+
+            output_list += output
+            labels_ids_list.append(labels_ids)
         elif mode == "crf":
             labels_ids = data[3].to(device, dtype=torch.long)
             output = model(token_ids, mask_ids, token_type_ids)
@@ -400,7 +529,7 @@ def development(model, device, dev_dataloader, tags_list, mode):
         end_labels_ids = torch.cat(end_labels_ids_list, dim=0)
         start_outputs = torch.cat(start_output_list, dim=0)
         end_outputs = torch.cat(end_output_list, dim=0)
-    elif mode == "crf":
+    elif mode == "crf" or mode == "softmax":
         labels_ids = torch.cat(labels_ids_list, dim=0)
     mask_ids_list = torch.cat(mask_ids_list, dim=0)
 
@@ -412,11 +541,11 @@ def development(model, device, dev_dataloader, tags_list, mode):
         outputs['num'] = start_labels_ids.size()[0]
         labels['start_labels_ids'] = start_labels_ids
         labels['end_labels_ids'] = end_labels_ids
-    elif mode == "crf":
+    elif mode == "crf" or mode == "softmax":
         outputs['outputs'] = output_list
         outputs['num'] = len(output_list)
         labels['labels_ids'] = labels_ids
-    f1, predict_list = evaluate(outputs, labels, mask_ids_list,tags_list, mode, False)
+    f1, predict_list = evaluate(outputs, labels, mask_ids_list, tags_list, mode, False)
 
     end_time = time.time()
     logging.info("Development end, speed: {:.1f} sentences/s, all time: {:.2f}s".format(
@@ -425,7 +554,9 @@ def development(model, device, dev_dataloader, tags_list, mode):
     return f1, predict_list
 
 
+# 训练过程
 def train(args, model, device, train_datasets, dev_datasets, tags_list, writer):
+    # 注意model.train()和model.eval()的不同作用。
     model.train()
     epoch_step = len(train_datasets) // args.train_batch_size + 1
     num_train_optimization_steps = epoch_step * args.epochs
@@ -434,6 +565,8 @@ def train(args, model, device, train_datasets, dev_datasets, tags_list, writer):
     logging.info("  Batch size = %d", args.train_batch_size)
     logging.info("  Num steps = %d", num_train_optimization_steps)
 
+    # os.walk方法，主要用来遍历一个目录内各个子目录和子文件。
+    # 可以得到一个三元tupple(dirpath, dirnames, filenames), 第一个为起始路径，第二个为起始路径下的文件夹，第三个是起始路径下的文件。
     _, _, files = list(os.walk(args.output_dir))[0]
     epoch = 0
     for file in files:
@@ -441,6 +574,7 @@ def train(args, model, device, train_datasets, dev_datasets, tags_list, writer):
             temp = file[11:-4]
             if temp.isdigit() and int(temp) > epoch:
                 epoch = int(temp)
+    # 如果训练了几轮，保存了模型，那就直接导入模型。
     if epoch > 0:
         logging.info('checkpoint-' + str(epoch) + '.pkl is exit!')
         model = torch.load(os.path.join(args.output_dir, 'checkpoint-' + str(epoch) + '.pkl'))
@@ -455,28 +589,33 @@ def train(args, model, device, train_datasets, dev_datasets, tags_list, writer):
         dev_dataloader = torch.utils.data.DataLoader(dev_datasets, batch_size=args.train_batch_size, shuffle=False)
 
     best_f1 = -1
+    # 如果已经保存了最好的模型，就直接导入！
     if os.path.exists(os.path.join(args.output_dir, 'checkpoint-best.pkl')):
         logging.info('checkpoint-best.pkl is exit!')
         model = torch.load(os.path.join(args.output_dir, 'checkpoint-best.pkl'))
-        best_f1, _ = development(model, device, dev_dataloader, tags_list)
+        best_f1, _ = development(model, device, dev_dataloader, tags_list, args.architecture)
         logging.info("Load best F1={:.4f}".format(best_f1))
 
     if args.architecture == "span":
         optimizer = transformers.AdamW(params=model.parameters(), lr=args.learning_rate)
+    if args.architecture == "softmax":
+        optimizer = transformers.AdamW(params=model.parameters(), lr=args.learning_rate)
     if args.architecture == "crf":
         optimizer = transformers.AdamW(
             params=[
-                {'params':model.bert.parameters()},
-                {'params':model.dence.parameters(), 'lr':args.crf_lr},
-                {'params':model.crf.parameters(), 'lr':args.crf_lr}
+                {'params': model.bert.parameters()},
+                {'params': model.dence.parameters(), 'lr': args.crf_lr},
+                {'params': model.crf.parameters(), 'lr': args.crf_lr}
             ],
             lr=args.learning_rate)
+    # 学习率预热函数，使学习率线性增长，然后到某一schedule，在线性/指数降低
     lr_scheduler = transformers.get_linear_schedule_with_warmup(
         optimizer,
         num_warmup_steps=int(num_train_optimization_steps) * args.warmup_proportion,
         num_training_steps=num_train_optimization_steps
     )
 
+    # 开始训练
     for current_epoch in range(epoch, args.epochs):
         model.train()
         all_loss = 0
@@ -488,32 +627,49 @@ def train(args, model, device, train_datasets, dev_datasets, tags_list, writer):
             if args.architecture == "span":
                 start_labels_ids = data[3].to(device, dtype=torch.long)
                 end_labels_ids = data[4].to(device, dtype=torch.long)
-
+                label = {
+                    "start_labels_ids": start_labels_ids,
+                    "end_labels_ids": end_labels_ids
+                }
                 start_output, end_output = model(token_ids, mask_ids, token_type_ids)
-                loss = model.loss(start_output, end_output, start_labels_ids, end_labels_ids, mask_ids)
+                output = {
+                    "start_output": start_output,
+                    "end_output": end_output
+                }
+                loss = model.loss(output, label, mask_ids)
+            elif args.architecture == "softmax":
+                labels_ids = data[3].to(device, dtype=torch.long)
+                output = model(token_ids, mask_ids, token_type_ids)
+                loss = model.loss(output, labels_ids, mask_ids)
             elif args.architecture == "crf":
                 labels_ids = data[3].to(device, dtype=torch.long)
                 output = model(token_ids, mask_ids, token_type_ids)
                 loss = model.loss(output, labels_ids, mask_ids)
 
             if writer:
-                writer.add_scalar('loss', loss, global_step=current_epoch * epoch_step + step)
+                writer.add_scalar('loss', loss, global_step=current_epoch * epoch_step + step + 1)
                 writer.add_scalar('learning_rate',
                                   optimizer.state_dict()['param_groups'][0]['lr'],
-                                  global_step=current_epoch * epoch_step + step)
+                                  global_step=current_epoch * epoch_step + step + 1)
             all_loss += loss.item()
 
-            optimizer.zero_grad()
+            optimizer.zero_grad()  # 把梯度置零，也就是把loss关于weight的导数变成0
+            # optimizer的step为什么不能放在min-batch那个循环之外，还有optimizer.step和loss.backward的区别：
+            # https://blog.csdn.net/xiaoxifei/article/details/87797935
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
 
+        # pytorch 中的 state_dict 是一个简单的python的字典对象,将每一层与它的对应参数建立映射关系。
+        # torch.optim模块中的Optimizer优化器对象也存在一个state_dict对象，此处的state_dict字典对象包含state和param_groups的字典对象，
+        # 而param_groups key对应的value也是一个由学习率，动量等参数组成的一个字典对象。
         lr = optimizer.state_dict()['param_groups'][0]['lr']
         end_time = time.time()
         logging.info("Epoch: {}, Loss: {:.3g}, learning rate: {:.3g}, Time: {:.2f}s".format(
-            current_epoch + 1, all_loss/step, lr, end_time-start_time))
+            current_epoch + 1, all_loss / (step + 1), lr, end_time - start_time))
         torch.save(model, os.path.join(args.output_dir, 'checkpoint-' + str(current_epoch + 1) + '.pkl'))
-        delet_checkpoints_name = os.path.join(args.output_dir, 'checkpoint-' + str(current_epoch + 1 - args.keep_last_n_checkpoints) + '.pkl')
+        delet_checkpoints_name = os.path.join(args.output_dir, 'checkpoint-' + str(
+            current_epoch + 1 - args.keep_last_n_checkpoints) + '.pkl')
         if os.path.exists(delet_checkpoints_name):
             os.remove(delet_checkpoints_name)
         if args.dev_file:
@@ -526,7 +682,7 @@ def train(args, model, device, train_datasets, dev_datasets, tags_list, writer):
                 writer.add_scalar('dev_f1', f1, global_step=current_epoch * epoch_step)
                 writer.add_scalar('dev_best_f1', best_f1, global_step=current_epoch * epoch_step)
 
-    torch.save(model, os.path.join(args.output_dir,  'checkpoint-last.pkl'))
+    torch.save(model, os.path.join(args.output_dir, 'checkpoint-last.pkl'))
     if args.dev_file:
         f1, _ = development(model, device, dev_dataloader, tags_list, args.architecture)
         if f1 == -1 or f1 > best_f1:
@@ -535,6 +691,8 @@ def train(args, model, device, train_datasets, dev_datasets, tags_list, writer):
             torch.save(model, os.path.join(args.output_dir, 'checkpoint-best.pkl'))
     logging.info("Training end!")
 
+
+# 计算评价指标：准确率，召回率，F1值
 def calculate(data):
     p = -1
     r = -1
@@ -548,6 +706,7 @@ def calculate(data):
     return p, r, f1
 
 
+# 评价过程，打印各类实体F1值和总体F1值
 def evaluate(outputs, labels, mask_ids, tags_list, mode, test_flag=False):
     def change_label_span(start_tags, end_tags, length):
         i = 0
@@ -563,7 +722,8 @@ def evaluate(outputs, labels, mask_ids, tags_list, mode, test_flag=False):
             i += 1
         return result
 
-    def change_label_crf(data, length, tags_list):
+    # CRF架构和softmax架构共用
+    def change_label_bio(data, length, tags_list):
         i = 0
         result = []
         while i < length:
@@ -582,7 +742,7 @@ def evaluate(outputs, labels, mask_ids, tags_list, mode, test_flag=False):
     sentence_num = outputs['num']
     if mode == 'span':
         entities_dict = {x + 1: [0, 0, 0] for x in range(len(tags_list))}
-    elif mode == 'crf':
+    elif mode == 'crf' or mode == "softmax":
         entities_dict = {}
         for tag in tags_list:
             if tag[0] == 'B':
@@ -592,15 +752,19 @@ def evaluate(outputs, labels, mask_ids, tags_list, mode, test_flag=False):
         if mode == 'span':
             length = mask_ids[i].sum()
             predict_list = change_label_span(outputs['start_outputs'][i], outputs['end_outputs'][i], length)
+        elif mode == 'softmax':
+            # 注意解码长度的问题。crf是人家写好的，正好解码句长+2个标签。所以softmax方法应该和span方法一样，取length=mask_ids[i].sum()。不然会按最大句长解码。
+            length = mask_ids[i].sum()
+            predict_list = change_label_bio(outputs['outputs'][i], length, tags_list)
         elif mode == 'crf':
             length = len(outputs['outputs'][i])
-            predict_list = change_label_crf(outputs['outputs'][i], length, tags_list)
+            predict_list = change_label_bio(outputs['outputs'][i], length, tags_list)
         result_list.append((predict_list, length - 2))
         if not test_flag:
             if mode == 'span':
                 label_list = change_label_span(labels['start_labels_ids'][i], labels['end_labels_ids'][i], length)
-            elif mode == 'crf':
-                label_list = change_label_crf(labels['labels_ids'][i], length, tags_list)
+            elif mode == 'softmax' or mode == 'crf':
+                label_list = change_label_bio(labels['labels_ids'][i], length, tags_list)
             for label in label_list:
                 entities_dict[label[2]][1] += 1
             for predict in predict_list:
@@ -620,6 +784,8 @@ def evaluate(outputs, labels, mask_ids, tags_list, mode, test_flag=False):
         for tag_type in entities_dict:
             if mode == "span":
                 tag = tags_list[tag_type - 1]
+            elif mode == 'softmax':
+                tag = tag_type
             elif mode == "crf":
                 tag = tag_type
             p, r, f1 = calculate(entities_dict[tag_type])
@@ -629,8 +795,13 @@ def evaluate(outputs, labels, mask_ids, tags_list, mode, test_flag=False):
     return result_f1, result_list
 
 
+# 验证过程，直接加载模型
 def dev(args, datasets, model, device, tags_list, sentences):
-    if os.path.exists(os.path.join(args.output_dir, 'checkpoint-best.pkl')):
+    # 加载模型，没有模型则报错
+    if args.model is not None:
+        model = torch.load(args.model)
+        logging.info("Load model:" + args.model)
+    elif os.path.exists(os.path.join(args.output_dir, 'checkpoint-best.pkl')):
         model = torch.load(os.path.join(args.output_dir, 'checkpoint-best.pkl'))
         logging.info("Load model:" + os.path.join(args.output_dir, 'checkpoint-best.pkl'))
     elif os.path.exists(os.path.join(args.output_dir, 'checkpoint-last.pkl')):
@@ -651,6 +822,8 @@ def dev(args, datasets, model, device, tags_list, sentences):
         for entity in predict:
             if args.architecture == 'span':
                 tag = tags_list[entity[2] - 1]
+            elif args.architecture == 'softmax':
+                tag = entity[2]
             elif args.architecture == 'crf':
                 tag = entity[2]
             result[entity[0] - 1] = "B-" + tag
@@ -669,13 +842,17 @@ def dev(args, datasets, model, device, tags_list, sentences):
     logging.info("Development data is written to file: " + os.path.join(args.output_dir, "development.txt") + '!')
 
 
+# 测试过程，直接加载模型
 def test(args, processor, tokenizer, model, device, tags_list):
-    if os.path.exists(os.path.join(args.output_dir,  'checkpoint-best.pkl')):
+    if args.model is not None:
+        model = torch.load(args.model)
+        logging.info("Load model:" + args.model)
+    elif os.path.exists(os.path.join(args.output_dir, 'checkpoint-best.pkl')):
         model = torch.load(os.path.join(args.output_dir, 'checkpoint-best.pkl'))
         logging.info("Load model:" + os.path.join(args.output_dir, 'checkpoint-best.pkl'))
-    elif os.path.exists(os.path.join(args.output_dir,  'checkpoint-last.pkl')):
-        model = torch.load(os.path.join(args.output_dir,  'checkpoint-last.pkl'))
-        logging.info("Load model:" + os.path.join(args.output_dir,  'checkpoint-last.pkl'))
+    elif os.path.exists(os.path.join(args.output_dir, 'checkpoint-last.pkl')):
+        model = torch.load(os.path.join(args.output_dir, 'checkpoint-last.pkl'))
+        logging.info("Load model:" + os.path.join(args.output_dir, 'checkpoint-last.pkl'))
     else:
         logging.info("Error! The model file does not exist!")
         exit(1)
@@ -693,6 +870,9 @@ def test(args, processor, tokenizer, model, device, tags_list):
         end_labels_ids_list = []
         start_output_list = []
         end_output_list = []
+    elif args.architecture == 'softmax':
+        labels_ids_list = []
+        output_list = []
     elif args.architecture == "crf":
         labels_ids_list = []
         output_list = []
@@ -704,6 +884,8 @@ def test(args, processor, tokenizer, model, device, tags_list):
         if args.architecture == "span":
             start_labels_ids = data[3].to(device, dtype=torch.long)
             end_labels_ids = data[4].to(device, dtype=torch.long)
+        elif args.architecture == 'softmax':
+            labels_ids = data[3].to(device, dtype=torch.long)
         elif args.architecture == "crf":
             labels_ids = data[3].to(device, dtype=torch.long)
         mask_ids_list.append(mask_ids)
@@ -717,6 +899,11 @@ def test(args, processor, tokenizer, model, device, tags_list):
             end_labels_ids_list.append(end_labels_ids)
             start_output_list.append(start_output)
             end_output_list.append(end_output)
+        elif args.architecture == 'softmax':
+            labels_ids_list.append(labels_ids)
+            output = model(token_ids, mask_ids, token_type_ids)
+            output = output.argmax(dim=-1)
+            output_list += output
         elif args.architecture == "crf":
             labels_ids_list.append(labels_ids)
             output = model(token_ids, mask_ids, token_type_ids)
@@ -728,6 +915,8 @@ def test(args, processor, tokenizer, model, device, tags_list):
         end_labels_ids = torch.cat(end_labels_ids_list, dim=0)
         start_outputs = torch.cat(start_output_list, dim=0)
         end_outputs = torch.cat(end_output_list, dim=0)
+    elif args.architecture == 'softmax':
+        labels_ids = torch.cat(labels_ids_list, dim=0)
     elif args.architecture == "crf":
         labels_ids = torch.cat(labels_ids_list, dim=0)
     mask_ids_list = torch.cat(mask_ids_list, dim=0)
@@ -740,11 +929,15 @@ def test(args, processor, tokenizer, model, device, tags_list):
         outputs['num'] = start_labels_ids.size()[0]
         labels['start_labels_ids'] = start_labels_ids
         labels['end_labels_ids'] = end_labels_ids
+    elif args.architecture == 'softmax':
+        outputs['outputs'] = output_list
+        outputs['num'] = len(output_list)
+        labels['labels_ids'] = labels_ids
     elif args.architecture == "crf":
         outputs['outputs'] = output_list
         outputs['num'] = len(output_list)
         labels['labels_ids'] = labels_ids
-    _, predict_list = evaluate(outputs, labels, mask_ids_list,tags_list, args.architecture, True)
+    _, predict_list = evaluate(outputs, labels, mask_ids_list, tags_list, args.architecture, True)
 
     write_data_list = []
     m = 0
@@ -758,6 +951,8 @@ def test(args, processor, tokenizer, model, device, tags_list):
             for entity in predict:
                 if args.architecture == 'span':
                     tag = tags_list[entity[2] - 1]
+                elif args.architecture == 'softmax':
+                    tag = entity[2]
                 elif args.architecture == 'crf':
                     tag = entity[2]
                 predict_tags[entity[0] - 1] = "B-" + tag
@@ -842,7 +1037,9 @@ def main():
 
     parser.add_argument("--output_dir", required=True, help="The output folder path.")
 
-    parser.add_argument("--architecture", default="span", choices=['span', 'crf'],
+    parser.add_argument("--model", default=None, help="The model path.")
+
+    parser.add_argument("--architecture", default="span", choices=['span', 'crf', 'softmax'],
                         help="The model architecture of neural network and what decoding method is adopted.")
     parser.add_argument("--train_batch_size", default=1, type=int,
                         help="The number of sentences contained in a batch during training.")
@@ -855,6 +1052,8 @@ def main():
     parser.add_argument("--crf_lr", default=0.0001, type=float,
                         help="The initial learning rate of CRF layer.")
     parser.add_argument("--max_len", required=True, type=int, help="The Maximum length of a sentence.")
+    parser.add_argument("--dropout", default=0.0, type=float,
+                        help="What percentage of neurons are discarded in the fully connected layers (0 ~ 1).")
     parser.add_argument("--keep_last_n_checkpoints", default=1, type=int,
                         help="Keep the last n checkpoints.")
     parser.add_argument("--warmup_proportion", default=0.1, type=float,
@@ -872,15 +1071,20 @@ def main():
 
     args = parser.parse_args()
 
-    # Set seed
-    set_seed(args.seed)
-
     logging.basicConfig(
         format='%(asctime)s - %(levelname)s - %(funcName)s: %(message)s',
         datefmt='%m-%d-%Y-%H:%M:%S',
         filemode='w',
         level=logging.INFO
     )
+
+    setting = vars(args)
+    logging.info("-" * 20 + "args" + "-" * 20)
+    for key, value in setting.items():
+        logging.info('%-30s%-s' % (key, str(value)))
+
+    # Set seed
+    set_seed(args.seed)
 
     if not args.train_file and not args.dev_file and not args.test_file:
         raise ValueError("At least one of `train_file`, `dev_file` or `test_file` must be not None.")
@@ -901,13 +1105,17 @@ def main():
     tags_list = None
     model = None
     if architecture == "span":
-        processor = SEProcessor()
+        processor = SpanProcessor()
         tags_list = processor.get_tags_list(args.tags_file)
-        model = SEModel(args.bert_config_file, config, len(tags_list) + 1)
+        model = SpanModel(args.bert_config_file, config, len(tags_list) + 1, args.dropout)
+    elif architecture == 'softmax':
+        processor = SoftMaxProcessor()
+        tags_list = processor.get_tags_list(args.tags_file)
+        model = SoftmaxModel(args.bert_config_file, config, len(tags_list), args.dropout)
     elif architecture == "crf":
         processor = CRFProcessor()
         tags_list = processor.get_tags_list(args.tags_file)
-        model = CRFModel(args.bert_config_file, config, len(tags_list))
+        model = CRFModel(args.bert_config_file, config, len(tags_list), args.dropout)
 
     model.to(device)
     logging.info(model)
@@ -915,18 +1123,18 @@ def main():
     writer = None
     if args.tensorboard_dir:
         writer = SummaryWriter(args.tensorboard_dir)
-        writer.add_graph(model,
-                         input_to_model=(torch.zeros(1, 10).to(device).long(),
-                                         torch.zeros(1, 10).to(device).long(),
-                                         torch.zeros(1, 10).to(device).long()),
-                         verbose=False)
+        # writer.add_graph(model, (torch.zeros(1, 10).to(device).long(),
+        #                          torch.zeros(1, 10).to(device).long(),
+        #                          torch.zeros(1, 10).to(device).long()))
 
     train_datasets = None
     dev_datasets, dev_data = None, None
+    # 只使用 --train_file 则只训练到固定轮数，保存为最后的模型 checkpoint-last.kpl
     if args.train_file:
         train_datasets = processor.load_train_dataset(args, tokenizer, tags_list)
-        if args.dev_file:
-            dev_datasets, dev_data = processor.load_dev_dataset(args, tokenizer, tags_list)
+    # 若使用 --train_file 和 --dev_file 则会额外域保存在开发集上的最高分数的模型 checkpoint-best.kpl
+    if args.dev_file:
+        dev_datasets, dev_data = processor.load_dev_dataset(args, tokenizer, tags_list)
     if args.train_file:
         train(args, model, device, train_datasets, dev_datasets, tags_list, writer)
     if args.dev_file:
@@ -937,4 +1145,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
