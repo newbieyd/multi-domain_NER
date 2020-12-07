@@ -1,7 +1,7 @@
 python -u ./ner.py \
 --architecture softmax \
 --bert_config_file ./bert-base-chinese \
---data_dir ./data 、
+--data_dir ./data \
 --domain news*msra*weibo \
 --train \
 --dev \
