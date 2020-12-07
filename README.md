@@ -37,6 +37,10 @@
 |&emsp;&emsp;&emsp;&emsp;|---dev.txt
                     
 |&emsp;&emsp;&emsp;&emsp;|---test.txt
+
+|&emsp;&emsp;|--class.txt —— Span方法使用的标签格式（实体类别）
+
+|&emsp;&emsp;|--tags.txt —— CRF和SoftMax方法使用的标签格式（BIO）
                     
 |-data_processor.py —— 数据集构建方法 
 
