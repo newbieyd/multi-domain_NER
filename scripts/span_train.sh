@@ -1,4 +1,4 @@
-python -u ./ner.py \
+python -u ./multi_domain_single_model.py \
 --architecture span \
 --bert_config_file ./bert-base-chinese \
 --data_dir ./data \
