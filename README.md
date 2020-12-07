@@ -1,14 +1,50 @@
-# Named Entity Recognition
+# Multi-domain Named Entity Recognition (Single Model)
 
-命名实体识别（Pytorch），支持BERT-SPAN、BERT-CRF、BERT-SoftMax等模型。
+多领域命名实体识别（Pytorch），支持BERT-SPAN、BERT-CRF、BERT-SoftMax等模型。该模型将所有领域的数据集混在一起训练，测试时按领域分开。
 
 ## 文件目录
 
-| 文件 | 描述 |
-| :----: | :----: |
-| _bert-base-chinese_ | BERT预训练模型文件（pytorch） |
-| _data_ | 数据（train, dev, test, tags） |
-| _ner.py_ | 多领域命名实体识别（pytorch） |
+|- _bert-base-chinese_ —— BERT预训练模型文件（pytorch） 
+
+|&emsp;|-- config.json —— BERT配置文件
+          
+|&emsp;|--pytorch_model.bin —— BERT模型
+ 
+|&emsp;|--vocab.txt —— BERT词表
+ 
+|-_data_  —— 数据
+
+|&emsp;|--news —— 领域数据
+          
+|&emsp;&emsp;|---train.txt
+                    
+|&emsp;&emsp;|---dev.txt
+                    
+|&emsp;&emsp;|---test.txt
+                    
+|&emsp;|--news —— 领域数据
+
+|&emsp;&emsp;|---train.txt
+                    
+|&emsp;&emsp;|---dev.txt
+                    
+|&emsp;&emsp;|---test.txt
+
+|&emsp;|--news —— 领域数据
+          
+|&emsp;&emsp;|---train.txt
+                    
+|&emsp;&emsp;|---dev.txt
+                    
+|&emsp;&emsp;|---test.txt
+                    
+|-_data_processor.py_ —— 数据集构建方法 
+
+|-_model.py_ —— 模型方法（SPAN、CRF、SoftMax） 
+
+|-_multi_domain_single_model.py_ —— 主方法（包括训练、验证、测试等） 
+
+|-_utils.py_ —— 一些基础函数 
 
 ## 数据格式说明
 
@@ -43,9 +79,11 @@ tqdm          --4.49.0
 | 参数 | 描述 | 解释 |
 | :---- | :---- | :---- |
 |-h, --help | show this help message and exit | |
-|--train_file | TRAIN_FILE The training file path. | 训练数据 |
-|--dev_file DEV_FILE |  The development file path. | 验证数据 |
-|--test_file TEST_FILE | The testing file path. | 测试数据 |
+|--data_dir DATA_DIR | The data folder path.  | 数据集的根目录 |
+|--domain DOMAIN | The domain names (multiple domains separated by \*)  | 领域名也是文件夹名（以\*分开） |
+|--train | Training | 训练 |
+|--dev |  Development. | 验证 |
+|--test | Testing. | 测试 |
 |--tags_file TAGS_FILE | The tags file path. | 标签数据 |
 |--output_dir OUTPUT_DIR | The output folder path. | 输出文件夹 |
 |--model MODEL | The model path. | 验证和测试的模型路径 |
@@ -67,11 +105,14 @@ tqdm          --4.49.0
 
 ## 可选参数特殊说明
 
---train_file --dev_file --test_file 分别同时代表运行方式
->+ 只使用 __--train_file__ 则只训练到固定轮数，保存为最后的模型 *checkpoint-last.kpl*
->+ 若使用 __--train_file__ 和 __--dev_file__ 则会额外域保存在开发集上的最高分数的模型 *checkpoint-best.kpl*
->+ __--test-file__ 则为测试方式如存在 *checkpoint-best.kpl* 则使用该模型，否则使用 *checkpoint-last.kpl*
+### 多领域数据格式
+--data_dir为数据的跟目录，其下的文件夹的名字同时也是领域名，以\*隔开组成--domain参数。并且每个文件夹下的文件名应为train.txt、dev.txt和test.txt。
 
+### 训练方式
+--train --dev --test 分别代表运行方式
+>+ 只使用 __--train__ 则只训练到固定轮数，保存为最后的模型 *checkpoint-last.kpl*
+>+ 若使用 __--train__ 和 __--dev__ 则会额外域保存在开发集上的最高分数的模型 *checkpoint-best.kpl*
+>+ __--test__ 则为测试方式如存在 *checkpoint-best.kpl* 则使用该模型，否则使用 *checkpoint-last.kpl*
 ### crf方法
 
 --crf_lr 有效，对CRF层设置不同的学习率
