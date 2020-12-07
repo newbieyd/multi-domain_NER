@@ -4,47 +4,47 @@
 
 ## 文件目录
 
-|- _bert-base-chinese_ —— BERT预训练模型文件（pytorch） 
+|-bert-base-chinese —— BERT预训练模型文件（pytorch） 
 
-|&emsp;|-- config.json —— BERT配置文件
+|&emsp;&emsp;|--config.json —— BERT配置文件
           
-|&emsp;|--pytorch_model.bin —— BERT模型
+|&emsp;&emsp;|--pytorch_model.bin —— BERT模型
  
-|&emsp;|--vocab.txt —— BERT词表
+|&emsp;&emsp;|--vocab.txt —— BERT词表
  
-|-_data_  —— 数据
+|-data —— 数据
 
-|&emsp;|--news —— 领域数据
+|&emsp;&emsp;|--news —— 领域数据
           
-|&emsp;&emsp;|---train.txt
+|&emsp;&emsp;&emsp;&emsp;|---train.txt
                     
-|&emsp;&emsp;|---dev.txt
+|&emsp;&emsp;&emsp;&emsp;|---dev.txt
                     
-|&emsp;&emsp;|---test.txt
+|&emsp;&emsp;&emsp;&emsp;|---test.txt
                     
-|&emsp;|--news —— 领域数据
+|&emsp;&emsp;|--news —— 领域数据
 
-|&emsp;&emsp;|---train.txt
+|&emsp;&emsp;&emsp;&emsp;|---train.txt
                     
-|&emsp;&emsp;|---dev.txt
+|&emsp;&emsp;&emsp;&emsp;|---dev.txt
                     
-|&emsp;&emsp;|---test.txt
+|&emsp;&emsp;&emsp;&emsp;|---test.txt
 
-|&emsp;|--news —— 领域数据
+|&emsp;&emsp;|--news —— 领域数据
           
-|&emsp;&emsp;|---train.txt
+|&emsp;&emsp;&emsp;&emsp;|---train.txt
                     
-|&emsp;&emsp;|---dev.txt
+|&emsp;&emsp;&emsp;&emsp;|---dev.txt
                     
-|&emsp;&emsp;|---test.txt
+|&emsp;&emsp;&emsp;&emsp;|---test.txt
                     
-|-_data_processor.py_ —— 数据集构建方法 
+|-data_processor.py —— 数据集构建方法 
 
-|-_model.py_ —— 模型方法（SPAN、CRF、SoftMax） 
+|-model.py —— 模型方法（SPAN、CRF、SoftMax） 
 
-|-_multi_domain_single_model.py_ —— 主方法（包括训练、验证、测试等） 
+|- multi_domain_single_model.py —— 主方法（包括训练、验证、测试等） 
 
-|-_utils.py_ —— 一些基础函数 
+|- utils.py —— 一些基础函数 
 
 ## 数据格式说明
 
