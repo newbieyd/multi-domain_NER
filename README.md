@@ -2,6 +2,8 @@
 
 多领域命名实体识别（Pytorch），支持BERT-SPAN、BERT-CRF、BERT-SoftMax等模型。该模型将所有领域的数据集混在一起训练，测试时按领域分开。
 
+单领域命名实体识别，请转至[V3.0](https://github.com/newbieyd/multi-domain_NER/releases/tag/v3.0)
+
 ## 文件目录
 
 |-bert-base-chinese —— BERT预训练模型文件（pytorch） 
