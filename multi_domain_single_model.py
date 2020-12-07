@@ -625,10 +625,10 @@ def main():
     parser = argparse.ArgumentParser(description="Named Entity Recognition: Multi_domain Single Model")
 
     parser.add_argument("--data_dir", required=True, help="The data folder path.")
-    parser.add_argument("--domain", required=True, help="The domain names (multiple domains separated by &)")
-    parser.add_argument("--train", default=False, action='store_true', help="The training file path.")
-    parser.add_argument("--dev", default=False, action='store_true', help="The development file path.")
-    parser.add_argument("--test", default=False, action='store_true', help="The testing file path.")
+    parser.add_argument("--domain", required=True, help="The domain names (multiple domains separated by *)")
+    parser.add_argument("--train", default=False, action='store_true', help="Training.")
+    parser.add_argument("--dev", default=False, action='store_true', help="Development.")
+    parser.add_argument("--test", default=False, action='store_true', help="Testing.")
     parser.add_argument("--tags_file", required=True, help="The tags file path.")
 
     parser.add_argument("--output_dir", required=True, help="The output folder path.")
