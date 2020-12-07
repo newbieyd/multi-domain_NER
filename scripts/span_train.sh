@@ -1,9 +1,11 @@
 python -u ./ner.py \
 --architecture span \
 --bert_config_file ./bert-base-chinese \
---train_file ./data/train.txt \
---dev_file ./data/dev.txt \
---test_file ./data/test.txt \
+--data_dir ./data 、
+--domain news*msra*weibo \
+--train \
+--dev \
+--test \
 --output_dir ./output \
 --max_len 200 \
 --tags_file ./data/class.txt \
