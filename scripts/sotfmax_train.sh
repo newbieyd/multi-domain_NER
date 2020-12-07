@@ -1,4 +1,4 @@
-python -u ./ner.py \
+python -u ./multi_domain_single_model.py \
 --architecture softmax \
 --bert_config_file ./bert-base-chinese \
 --data_dir ./data \
