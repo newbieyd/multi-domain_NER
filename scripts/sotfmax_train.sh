@@ -1,12 +1,14 @@
 python -u ./ner.py \
---architecture sotfmax \
+--architecture softmax \
 --bert_config_file ./bert-base-chinese \
---train_file ./data/train.txt \
---dev_file ./data/dev.txt \
---test_file ./data/test.txt \
+--data_dir ./data 、
+--domain news*msra*weibo \
+--train \
+--dev \
+--test \
 --output_dir ./output \
 --max_len 200 \
---tags_file ./data/tags.txt \
+--tags_file ./data/class.txt \
 --train_batch_size 25 \
 --learning_rate 5e-5 \
 --epoch 30 \
