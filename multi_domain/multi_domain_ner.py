@@ -7,7 +7,7 @@ import torch
 import transformers
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
-from model import SpanModel, CRFModel, SoftmaxModel
+from model import SpanDomainModel, CRFModel, SoftmaxModel
 from data_processor import SpanProcessor, CRFProcessor, SoftMaxProcessor
 from utils import set_seed, calculate
 
@@ -17,7 +17,7 @@ def evaluate(data, tags_list, title, mode, test_flag=False):
     def change_label_span(start_tags, end_tags, length):
         i = 0
         result = []
-        while i < length:
+        while i < length - 1:
             if start_tags[i] != 0:
                 tag = start_tags[i]
                 start_index = i
@@ -28,32 +28,10 @@ def evaluate(data, tags_list, title, mode, test_flag=False):
             i += 1
         return result
 
-    # CRF架构和softmax架构共用
-    def change_label_bio(data, length, tags_list):
-        i = 0
-        result = []
-        while i < length:
-            if tags_list[data[i]][0] == 'B':
-                tag = tags_list[data[i]][2:]
-                start_index = i
-                i += 1
-                while i < length and tags_list[data[i]] == 'I-' + tag:
-                    i += 1
-                result.append((start_index, i, tag))
-                i -= 1
-            i += 1
-        return result
-
     result_f1 = None
     result_dict = {}
     if mode == 'span':
         domain_entities_dict = {x + 1: [0, 0, 0] for x in range(len(tags_list))}
-    elif mode == 'crf' or mode == "softmax":
-        domain_entities_dict = {}
-        for tag in tags_list:
-            if tag[0] == 'B':
-                domain_entities_dict[tag[2:]] = [0, 0, 0]
-    domain_result_dict = {}
     logging.info("***** {} Evaluation *****".format(title))
     for domain, domain_data in data.items():
         outputs = domain_data['outputs']
@@ -62,29 +40,15 @@ def evaluate(data, tags_list, title, mode, test_flag=False):
         sentence_num = outputs['num']
         if mode == 'span':
             entities_dict = {x + 1: [0, 0, 0] for x in range(len(tags_list))}
-        elif mode == 'crf' or mode == "softmax":
-            entities_dict = {}
-            for tag in tags_list:
-                if tag[0] == 'B':
-                    entities_dict[tag[2:]] = [0, 0, 0]
         result_list = []
         for i in range(sentence_num):
             if mode == 'span':
                 length = mask_ids[i].sum()
                 predict_list = change_label_span(outputs['start_outputs'][i], outputs['end_outputs'][i], length)
-            elif mode == 'softmax':
-                # 注意解码长度的问题。crf是人家写好的，正好解码句长+2个标签。所以softmax方法应该和span方法一样，取length=mask_ids[i].sum()。不然会按最大句长解码。
-                length = mask_ids[i].sum()
-                predict_list = change_label_bio(outputs['outputs'][i], length, tags_list)
-            elif mode == 'crf':
-                length = len(outputs['outputs'][i])
-                predict_list = change_label_bio(outputs['outputs'][i], length, tags_list)
             result_list.append((predict_list, length - 2))
             if not test_flag:
                 if mode == 'span':
                     label_list = change_label_span(labels['start_labels_ids'][i], labels['end_labels_ids'][i], length)
-                elif mode == 'softmax' or mode == 'crf':
-                    label_list = change_label_bio(labels['labels_ids'][i], length, tags_list)
                 for label in label_list:
                     entities_dict[label[2]][1] += 1
                 for predict in predict_list:
@@ -104,10 +68,6 @@ def evaluate(data, tags_list, title, mode, test_flag=False):
             for tag_type in entities_dict:
                 if mode == "span":
                     tag = tags_list[tag_type - 1]
-                elif mode == 'softmax':
-                    tag = tag_type
-                elif mode == "crf":
-                    tag = tag_type
                 p, r, f1 = calculate(entities_dict[tag_type])
                 logging.info("{} Precision={:.4f}, Recall={:.4f}, F1={:.4f}, predict: {}, truth: {}, "
                              "right: {}".format(tag, p, r, f1, entities_dict[tag_type][0],
@@ -128,10 +88,6 @@ def evaluate(data, tags_list, title, mode, test_flag=False):
         for tag_type in domain_entities_dict:
             if mode == "span":
                 tag = tags_list[tag_type - 1]
-            elif mode == 'softmax':
-                tag = tag_type
-            elif mode == "crf":
-                tag = tag_type
             p, r, f1 = calculate(domain_entities_dict[tag_type])
             logging.info("{} Precision={:.4f}, Recall={:.4f}, F1={:.4f}, predict: {}, truth: {}, "
                          "right: {}".format(tag, p, r, f1, domain_entities_dict[tag_type][0],
@@ -145,9 +101,6 @@ def get_one_domain_predict(dev_dataloader, model, device, title, mode):
         end_labels_ids_list = []
         start_output_list = []
         end_output_list = []
-    elif mode == "softmax" or mode == "crf":
-        labels_ids_list = []
-        output_list = []
     mask_ids_list = []
     # tqdm进度条库，可视化
     for _, data in enumerate(tqdm(dev_dataloader, desc=title)):
@@ -157,29 +110,13 @@ def get_one_domain_predict(dev_dataloader, model, device, title, mode):
         if mode == "span":
             start_labels_ids = data[3].to(device, dtype=torch.long)
             end_labels_ids = data[4].to(device, dtype=torch.long)
-            start_output, end_output = model(token_ids, mask_ids, token_type_ids)
-            start_output = start_output.argmax(dim=-1)
-            end_output = end_output.argmax(dim=-1)
-
+            output = model(token_ids, mask_ids, token_type_ids)
+            start_output = output["final_start_output"].argmax(dim=-1)
+            end_output = output["final_end_output"].argmax(dim=-1)
             start_labels_ids_list.append(start_labels_ids)
             end_labels_ids_list.append(end_labels_ids)
             start_output_list.append(start_output)
             end_output_list.append(end_output)
-        elif mode == "softmax":
-            labels_ids = data[3].to(device, dtype=torch.long)
-            output = model(token_ids, mask_ids, token_type_ids)
-            output = output.argmax(dim=-1)
-
-            output_list += output
-            labels_ids_list.append(labels_ids)
-        elif mode == "crf":
-            labels_ids = data[3].to(device, dtype=torch.long)
-            output = model(token_ids, mask_ids, token_type_ids)
-            output = model.decode(output, mask_ids)
-
-            labels_ids_list.append(labels_ids)
-            output_list += output
-
         mask_ids_list.append(mask_ids)
 
     if mode == "span":
@@ -187,9 +124,7 @@ def get_one_domain_predict(dev_dataloader, model, device, title, mode):
         end_labels_ids = torch.cat(end_labels_ids_list, dim=0)
         start_outputs = torch.cat(start_output_list, dim=0)
         end_outputs = torch.cat(end_output_list, dim=0)
-    elif mode == "crf" or mode == "softmax":
-        labels_ids = torch.cat(labels_ids_list, dim=0)
-    mask_ids_list = torch.cat(mask_ids_list, dim=0)
+    mask_ids = torch.cat(mask_ids_list, dim=0)
 
     outputs = {}
     labels = {}
@@ -199,11 +134,7 @@ def get_one_domain_predict(dev_dataloader, model, device, title, mode):
         outputs['num'] = start_labels_ids.size()[0]
         labels['start_labels_ids'] = start_labels_ids
         labels['end_labels_ids'] = end_labels_ids
-    elif mode == "crf" or mode == "softmax":
-        outputs['outputs'] = output_list
-        outputs['num'] = len(output_list)
-        labels['labels_ids'] = labels_ids
-    return outputs, labels, mask_ids_list
+    return outputs, labels, mask_ids
 
 
 # 如果有了模型，则进行验证，span，crf，softmax架构可选择
@@ -222,7 +153,6 @@ def development(model, device, dev_dataloader_dict, tags_list, mode):
             "labels": labels,
             "mask_ids": mask_ids_list
         }
-
     f1, predict_dict = evaluate(all_data, tags_list, "Development", mode, False)
 
     end_time = time.time()
@@ -307,25 +237,14 @@ def train(args, model, device, train_datasets, dev_datasets, tags_list, writer):
             if args.architecture == "span":
                 start_labels_ids = data[3].to(device, dtype=torch.long)
                 end_labels_ids = data[4].to(device, dtype=torch.long)
+                domain_labels_ids = data[5].to(device, dtype=torch.long)
                 label = {
                     "start_labels_ids": start_labels_ids,
-                    "end_labels_ids": end_labels_ids
+                    "end_labels_ids": end_labels_ids,
+                    "domain_labels_ids":  domain_labels_ids,
                 }
-                start_output, end_output = model(token_ids, mask_ids, token_type_ids)
-                output = {
-                    "start_output": start_output,
-                    "end_output": end_output
-                }
+                output = model(token_ids, mask_ids, token_type_ids)
                 loss = model.loss(output, label, mask_ids)
-            elif args.architecture == "softmax":
-                labels_ids = data[3].to(device, dtype=torch.long)
-                output = model(token_ids, mask_ids, token_type_ids)
-                loss = model.loss(output, labels_ids, mask_ids)
-            elif args.architecture == "crf":
-                labels_ids = data[3].to(device, dtype=torch.long)
-                output = model(token_ids, mask_ids, token_type_ids)
-                loss = model.loss(output, labels_ids, mask_ids)
-
             if writer:
                 writer.add_scalar('loss', loss, global_step=current_epoch * epoch_step + step + 1)
                 writer.add_scalar('learning_rate',
@@ -629,13 +548,12 @@ def main():
     parser.add_argument("--train", default=False, action='store_true', help="Training.")
     parser.add_argument("--dev", default=False, action='store_true', help="Development.")
     parser.add_argument("--test", default=False, action='store_true', help="Testing.")
-    parser.add_argument("--tags_file", required=True, help="The tags file path.")
 
     parser.add_argument("--output_dir", required=True, help="The output folder path.")
 
     parser.add_argument("--model", default=None, help="The model path.")
 
-    parser.add_argument("--architecture", default="span", choices=['span', 'crf', 'softmax'],
+    parser.add_argument("--architecture", default="span", choices=['span'],
                         help="The model architecture of neural network and what decoding method is adopted.")
     parser.add_argument("--train_batch_size", default=1, type=int,
                         help="The number of sentences contained in a batch during training.")
@@ -656,6 +574,8 @@ def main():
                         help="Proportion of training to perform linear learning rate warmup for. ")
     parser.add_argument("--split", default=", . ， 。 ！ ？ ! ?", help="Characters that segments a sentence.")
     parser.add_argument("--tensorboard_dir", default=None, help="The data address of the tensorboard.")
+    parser.add_argument("--domain_loss_rate", default=1.0, type=float, help="Weight of domain loss.")
+    parser.add_argument("--domain_ner_loss_rate", default=1.0, type=float, help="Weight of domain ner loss.")
 
     parser.add_argument("--bert_config_file", required=True,
                         help="The config json file corresponding to the pre-trained BERT model. "
@@ -697,21 +617,14 @@ def main():
     tokenizer = transformers.BertTokenizer.from_pretrained(args.bert_config_file)
     config = transformers.BertConfig(args.bert_config_file)
 
+    domains = args.domain.split('*')
     processor = None
     tags_list = None
     model = None
     if architecture == "span":
         processor = SpanProcessor(args.split, args.max_len)
-        tags_list = processor.get_tags_list(args.tags_file)
-        model = SpanModel(args.bert_config_file, config, len(tags_list) + 1, args.dropout)
-    elif architecture == 'softmax':
-        processor = SoftMaxProcessor(args.split, args.max_len)
-        tags_list = processor.get_tags_list(args.tags_file)
-        model = SoftmaxModel(args.bert_config_file, config, len(tags_list), args.dropout)
-    elif architecture == "crf":
-        processor = CRFProcessor(args.split, args.max_len)
-        tags_list = processor.get_tags_list(args.tags_file)
-        model = CRFModel(args.bert_config_file, config, len(tags_list), args.dropout)
+        domain_tags = processor.get_domain_tags(args.data_dir, domains)
+        model = SpanDomainModel(args.bert_config_file, config, domain_tags, args.dropout, args.domain_loss_rate, args.domain_ner_loss_rate)
 
     model.to(device)
     logging.info(model)
@@ -725,24 +638,23 @@ def main():
 
     dev_datasets = {}
     # 只使用 --train_file 则只训练到固定轮数，保存为最后的模型 checkpoint-last.kpl
-    domains = args.domain.split('*')
     if args.train:
-        train_datasets = processor.load_multidomain_train_dataset(args.data_dir, domains, tokenizer, tags_list)
+        train_datasets = processor.load_multidomain_train_dataset(args.data_dir, domain_tags, tokenizer)
     # 若使用 --train_file 和 --dev_file 则会额外域保存在开发集上的最高分数的模型 checkpoint-best.kpl
     if args.dev:
         for domain in domains:
             logging.info("--- {} ---".format(domain))
-            dev_dataset, dev_data = processor.load_dev_dataset(os.path.join(args.data_dir, domain, "dev.txt"), tokenizer, tags_list)
+            dev_dataset, dev_data = processor.load_dev_dataset(os.path.join(args.data_dir, domain, "dev.txt"), tokenizer, domain_tags[-1][1])
             dev_datasets[domain] = {
                 "dev_dataset": dev_dataset,
                 "dev_data": dev_data
             }
     if args.train:
-        train(args, model, device, train_datasets, dev_datasets, tags_list, writer)
+        train(args, model, device, train_datasets, dev_datasets, domain_tags[-1][1], writer)
     if args.dev:
-        dev(args, dev_datasets, model, device, tags_list)
+        dev(args, dev_datasets, model, device, domain_tags[-1][1])
     if args.test:
-        test(args, processor, tokenizer, model, device, domains, tags_list)
+        test(args, processor, tokenizer, model, device, domains, domain_tags[-1][1])
 
 
 if __name__ == "__main__":
