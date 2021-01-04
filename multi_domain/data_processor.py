@@ -12,7 +12,10 @@ class NERProcessor:
     def load_train_dataset(self, file_path, tokenizer, class_list):
         return None
 
-    def load_multidomain_train_dataset(self, data_dir, domains, tokenizer, tags_list):
+    def load_multidomain_train_single_model_dataset(self, data_dir, domains, tokenizer, tags_list):
+        return None
+
+    def load_multidomain_train_dataset(self, data_dir, domains, tokenizer):
         return None
 
     def load_dev_dataset(self, file_path, tokenizer, class_list):
@@ -112,43 +115,70 @@ class SpanProcessor(NERProcessor):
     def load_train_dataset(self, train_file, tokenizer, class_list):
         data = self._load_data(train_file, "training")
         data, _ = self._split(data, True, mode="span")
-        datasets = self._make_dataset(data, tokenizer, class_list, "Traning", 5)
+        datasets = self._make_dataset(data, tokenizer, class_list, "Traning", num=5)
         return datasets
 
-    def load_multidomain_train_dataset(self, data_dir, domains, tokenizer, class_list):
+    def load_multidomain_single_model_train_dataset(self, data_dir, domains, tokenizer, class_list):
         data_list = []
         for domain in domains:
             data = self._load_data(os.path.join(data_dir, domain, "train.txt"), "training")
             data_list.extend(data)
         data, _ = self._split(data_list, True, mode="span")
-        datasets = self._make_dataset(data, tokenizer, class_list, "Traning", 5)
+        datasets = self._make_dataset(data, tokenizer, class_list, "Traning", num=5)
+        return datasets
+
+    def load_multidomain_train_dataset(self, data_dir, domain_tags, tokenizer):
+        data_list = []
+        domain_list = []
+        for domain in domain_tags[:-1]:
+            domain_list.append(domain[0])
+            data = self._load_data(os.path.join(data_dir, domain[0], "train.txt"), "training")
+            data, _ = self._split(data, True, mode="span")
+            for sentence in data:
+                data_list.append(sentence + (domain[0],))
+        datasets = self._make_dataset(data_list, tokenizer, domain_tags[-1][1], "Traning", domain_list=domain_list, num=5)
         return datasets
 
     def load_dev_dataset(self, dev_file, tokenizer, class_list):
         data = self._load_data(dev_file, "development")
         data, new_data = self._split(data, True, mode="span")
-        datasets = self._make_dataset(data, tokenizer, class_list, "development", 5)
+        datasets = self._make_dataset(data, tokenizer, class_list, "development", num=5)
         return datasets, new_data
 
     def load_test_dataset(self, test_file, tokenizer, class_list):
         original_data = self._load_data(test_file, "testing")
         data, _ = self._split(original_data, False, mode="span")
-        datasets = self._make_dataset(data, tokenizer, class_list, "Testing", 5)
+        datasets = self._make_dataset(data, tokenizer, class_list, "Testing", num=5)
         return datasets, original_data
 
     # span架构，取出data下的class.txt文件标签，并返回class_list。
-    def get_tags_list(self, tags_file):
+    def get_tags_list(self, tags_file, domain=None):
         class_list = []
         with open(tags_file, "r", encoding="utf8") as fin:
             for line in fin.readlines():
                 data = line.replace("\n", "")
                 if len(data) > 0:
                     class_list.append(data)
-        logging.info("Class:" + str(class_list))
+        if domain is not None:
+            logging.info(domain + " class:" + str(class_list))
+        else:
+            logging.info("Class:" + str(class_list))
         return class_list
 
+    def get_domain_tags(self, data_dir, domains):
+        domain_tags = []
+        all_list = []
+        for domain in domains:
+            tags_list = self.get_tags_list(os.path.join(data_dir, domain, "class.txt"), domain)
+            domain_tags.append((domain, tags_list))
+            for tag in tags_list:
+                if tag not in all_list:
+                    all_list.append(tag)
+        domain_tags.append(('all', all_list))
+        return domain_tags
+
     # 把train，dev，test文本转化成ID号。返回的是token_ids_list，mask_ids_list，token_type_ids_list，start_labels_ids_list，end_labels_ids_list张量。
-    def _make_dataset(self, data, tokenizer, class_list, mode, num=0):
+    def _make_dataset(self, data, tokenizer, class_list, mode, domain_list=None, num=0):
 
         # 把句子中每个字的标签转换成标签列表中的ID号。
         def change_labels_to_ids(data, class_dict):
@@ -163,6 +193,7 @@ class SpanProcessor(NERProcessor):
         token_type_ids_list = []
         start_labels_ids_list = []
         end_labels_ids_list = []
+        domain_label_ids_list = []
         class_dict = {x: i + 1 for i, x in enumerate(class_list)}
         class_dict['O'] = 0
         for i, sentence in enumerate(data):
@@ -173,6 +204,8 @@ class SpanProcessor(NERProcessor):
             mask_ids = [1] * len(token_ids)
             start_label_ids = change_labels_to_ids(start_labels, class_dict)
             end_label_ids = change_labels_to_ids(end_labels, class_dict)
+            if domain_list is not None:
+                domain_label_ids = domain_list.index(sentence[3])
             assert len(start_label_ids) == len(end_label_ids) == len(token_ids)
 
             while len(token_ids) < self.max_len:
@@ -193,20 +226,34 @@ class SpanProcessor(NERProcessor):
                 logging.info("token_type_ids_list: %s" % " ".join([str(x) for x in ([0] * len(token_ids))]))
                 logging.info("start_label_ids: %s" % " ".join([str(x) for x in start_label_ids]))
                 logging.info("end_label_ids: %s" % " ".join([str(x) for x in end_label_ids]))
+                if domain_list is not None:
+                    logging.info("domain_label_ids: %s" % " ".join(str(domain_label_ids)))
 
             token_ids_list.append(token_ids)
             mask_ids_list.append(mask_ids)
             token_type_ids_list.append([0] * len(token_ids))
             start_labels_ids_list.append(start_label_ids)
             end_labels_ids_list.append(end_label_ids)
+            if domain_list is not None:
+                domain_label_ids_list.append(domain_label_ids)
 
-        return torch.utils.data.TensorDataset(
-            torch.tensor(token_ids_list, dtype=torch.long),
-            torch.tensor(mask_ids_list, dtype=torch.long),
-            torch.tensor(token_type_ids_list, dtype=torch.long),
-            torch.tensor(start_labels_ids_list, dtype=torch.long),
-            torch.tensor(end_labels_ids_list, dtype=torch.long)
-        )
+        if domain_list is not None:
+            return torch.utils.data.TensorDataset(
+                torch.tensor(token_ids_list, dtype=torch.long),
+                torch.tensor(mask_ids_list, dtype=torch.long),
+                torch.tensor(token_type_ids_list, dtype=torch.long),
+                torch.tensor(start_labels_ids_list, dtype=torch.long),
+                torch.tensor(end_labels_ids_list, dtype=torch.long),
+                torch.tensor(domain_label_ids_list, dtype=torch.long)
+            )
+        else:
+            return torch.utils.data.TensorDataset(
+                torch.tensor(token_ids_list, dtype=torch.long),
+                torch.tensor(mask_ids_list, dtype=torch.long),
+                torch.tensor(token_type_ids_list, dtype=torch.long),
+                torch.tensor(start_labels_ids_list, dtype=torch.long),
+                torch.tensor(end_labels_ids_list, dtype=torch.long),
+            )
 
 
 # CRF架构所需的数据处理类
@@ -218,7 +265,7 @@ class CRFProcessor(NERProcessor):
         datasets = self._make_dataset(data, tokenizer, tags_list, "Traning", 5)
         return datasets
 
-    def load_multidomain_train_dataset(self, data_dir, domains, tokenizer, tags_list):
+    def load_multidomain_single_model_train_dataset(self, data_dir, domains, tokenizer, tags_list):
         data_list = []
         for domain in domains:
             data = self._load_data(os.path.join(data_dir, domain, "train.txt"), "training")
