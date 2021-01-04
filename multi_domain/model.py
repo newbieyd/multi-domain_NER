@@ -1,6 +1,5 @@
 import torch
 import transformers
-from torchcrf import CRF
 
 # NER模型的父类
 class NERModel(torch.nn.Module):
